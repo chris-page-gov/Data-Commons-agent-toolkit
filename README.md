@@ -6,6 +6,8 @@ This repo contains MCP tools and sample agents for fetching public information f
 
 * [Quickstart with Gemini CLI](docs/quickstart.md)
 * [User guide](docs/user_guide.md)
+* [Detailed MCP Usage Guide](USAGE.md)
+* [AI Agent / Copilot Instructions](.github/copilot-instructions.md)
 
 ## MCP Server
 
