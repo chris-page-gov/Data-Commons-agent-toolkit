@@ -71,7 +71,7 @@ async def health_check(request: Request) -> PlainTextResponse:  # noqa: ARG001 r
     return PlainTextResponse("OK")
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def get_observations(
     variable_dcid: str,
     place_dcid: str,
@@ -316,7 +316,7 @@ async def get_datacommons_chart_config(
         raise ValueError(f"Validation failed for chart_type '{chart_type}': {e}") from e
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def search_indicators(
     query: str,
     places: list[str] | None = None,
@@ -574,3 +574,5 @@ async def search_indicators(
         include_topics=include_topics,
         maybe_bilateral=maybe_bilateral,
     )
+
+# Using decorator-based registration; no manual fallback needed.

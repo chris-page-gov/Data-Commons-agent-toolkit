@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
 import sys
+import uvicorn
 
 import click
 from click.core import Context, Option, ParameterSource
@@ -68,15 +70,24 @@ def _run_api_key_validation(ctx: Context, *, skip_validation: bool) -> None:
 
 
 def _run_http_server(host: str, port: int) -> None:
-    """Starts the server in Streamable HTTP mode."""
+    """Starts the server in HTTP mode (persistent)."""
     from datacommons_mcp.server import mcp
 
-    click.echo("Starting DataCommons MCP server in Streamable HTTP mode")
+    click.echo("Starting DataCommons MCP server (uvicorn http)")
     click.echo(f"Version: {__version__}")
-    click.echo(f"Server URL: http://{host}:{port}")
-    click.echo(f"Streamable HTTP endpoint: http://{host}:{port}/mcp")
+    click.echo(f"Health: http://{host}:{port}/health")
+    click.echo(f"MCP: http://{host}:{port}/mcp")
     click.echo("Press CTRL+C to stop")
-    mcp.run(host=host, port=port, transport="streamable-http", stateless_http=True)
+    names = "unavailable"
+    if hasattr(mcp, "get_tools"):
+        try:
+            tools = asyncio.run(mcp.get_tools())  # type: ignore[arg-type]
+            names = ", ".join(t.name for t in tools)
+        except Exception as e:  # noqa: BLE001
+            names = f"error: {e}"
+    click.echo(f"[diag] tools: {names}")
+    click.echo("[diag] starting uvicorn")
+    uvicorn.run(mcp.http_app, host=host, port=port, log_level="info")
 
 
 def _run_stdio_server() -> None:
@@ -85,8 +96,10 @@ def _run_stdio_server() -> None:
 
     click.echo("Starting DataCommons MCP server in stdio mode", err=True)
     click.echo(f"Version: {__version__}", err=True)
-    click.echo("Server is ready to receive requests via stdin/stdout", err=True)
+    click.echo("Ready for stdin/stdout requests", err=True)
+    click.echo("[diag] Entering mcp.run() (stdio)", err=True)
     mcp.run(transport="stdio")
+    click.echo("[diag] mcp.run() returned (stdio) - stdin closed", err=True)
 
 
 @cli.command()
@@ -97,8 +110,8 @@ def _run_stdio_server() -> None:
     default=False,
     help="Skip the validation of the DC_API_KEY at startup.",
 )
-@click.option("--host", default="localhost", help="Host to bind (http mode only).")
-@click.option("--port", default=8080, help="Port to bind (http mode only).", type=int)
+@click.option("--host", default="localhost", help="Host (http mode only).")
+@click.option("--port", default=8080, help="Port (http mode only).", type=int)
 @click.pass_context
 def serve(
     ctx: click.Context,

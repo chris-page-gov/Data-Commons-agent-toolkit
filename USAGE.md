@@ -118,6 +118,87 @@ uvx datacommons-mcp serve stdio
 
 Ensure `DC_API_KEY` is exported; add `CUSTOM_DC_URL` for custom instances.
 
+### 8.1 VS Code Integration
+
+This repository includes `.vscode/tasks.json` and `.vscode/launch.json` to streamline running and debugging the MCP server.
+
+Steps:
+
+1. Copy `.env.example` to `.env` (or export in your shell) and set `DC_API_KEY`.
+2. In PowerShell (temporary session):
+
+```powershell
+$env:DC_API_KEY="<your_key>"
+```
+
+1. Run a task (Ctrl+Shift+P → "Run Task" → "Serve MCP (HTTP)" or "Serve MCP (stdio)").
+1. For debugging, use the "Debug MCP Server (HTTP)" launch config (ensure the Python debugger extension is installed; update type to `debugpy` if prompted).
+1. Health check:
+
+```powershell
+curl http://localhost:8080/health
+```
+
+1. Minimal tool call (HTTP example) using a quick Python snippet:
+
+```powershell
+uv run python - <<'PY'
+import asyncio, httpx
+async def main():
+    payload = {"tool_name":"search_indicators","args":{"query":"population","places":["France"],"include_topics":False}}
+    r = httpx.post("http://localhost:8080/mcp/tools/search_indicators", json=payload, timeout=30)
+    print(r.status_code)
+    print(r.json())
+asyncio.run(main())
+PY
+```
+
+1. Stdio agent test: run the sample agent in `packages/datacommons-mcp/examples/sample_agents/basic_agent/agent.py` after setting `DC_API_KEY`:
+
+```powershell
+uv run python packages/datacommons-mcp/examples/sample_agents/basic_agent/agent.py
+```
+
+1. Stop server: Ctrl+C in its terminal.
+
+If `DC_API_KEY` is invalid, startup will fail unless you pass `--skip-api-key-validation` on the serve command.
+
+### 8.2 Container / Devcontainer Usage
+
+If you develop inside a VS Code dev container (recommended for a clean host):
+
+1. Open Command Palette → "Dev Containers: Reopen in Container" (after adding `.devcontainer/` files).
+1. Set your API key inside the container shell:
+
+```bash
+export DC_API_KEY="<your_key>"
+```
+
+1. Run fallback tasks if `uvx` is not present:
+
+```bash
+python -m datacommons_mcp.cli serve http --port 8080
+# or
+python -m datacommons_mcp.cli serve stdio
+```
+
+1. Install uv optionally (already done in devcontainer build):
+
+```bash
+pip install uv
+uv pip install -e .[test]
+```
+
+1. Switch tasks to the uvx variant once `uvx` exists in PATH:
+
+```bash
+uvx datacommons-mcp serve http --port 8080
+```
+
+1. Health check and tool invocation remain identical.
+
+If you see `uvx: The term 'uvx' is not recognized`, it means uv was not installed in the current environment or PATH not refreshed—use the python -m fallback above.
+
 ## 9. Related Files
 
 - `packages/datacommons-mcp/datacommons_mcp/services.py` – validation & processing
