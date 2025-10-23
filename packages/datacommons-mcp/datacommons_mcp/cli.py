@@ -2,9 +2,9 @@ import asyncio
 import logging
 import os
 import sys
-import uvicorn
 
 import click
+import uvicorn
 from click.core import Context, Option, ParameterSource
 
 from .exceptions import APIKeyValidationError, InvalidAPIKeyError

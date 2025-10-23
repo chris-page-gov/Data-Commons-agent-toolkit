@@ -119,12 +119,24 @@ if ($Background) {
     Write-Warning 'Background stdio mode offers no interactive channel; consider http mode instead.'
   }
   Write-Host "[bg] Launching background server (mode=$Mode host=$BindHost port=$Port)" -ForegroundColor Green
-  $argList = @('-m') + $serveArgs
-  if ($LogFile) {
-    $proc = Start-Process -FilePath $pythonExe -ArgumentList $argList -PassThru -WindowStyle Hidden -RedirectStandardOutput $LogFile -RedirectStandardError $LogFile
-    Write-Host "[bg] Logging -> $LogFile"
+  # Use unbuffered (-u) to force immediate stdout/stderr flush and include module (-m)
+  $argList = @('-u','-m') + $serveArgs
+  # Emit quick env diagnostics prior to launch
+  Write-Host "[bg] PYTHONUNBUFFERED will be active (-u flag)." -ForegroundColor DarkGray
+  if ($env:DC_API_KEY) {
+    Write-Host "[bg] DC_API_KEY length: $($env:DC_API_KEY.Length)" -ForegroundColor DarkGray
   } else {
-    $proc = Start-Process -FilePath $pythonExe -ArgumentList $argList -PassThru -WindowStyle Hidden
+    Write-Host "[bg] DC_API_KEY not present in environment prior to launch." -ForegroundColor Yellow
+  }
+  if ($LogFile) {
+    # PowerShell Start-Process cannot redirect stdout & stderr to the SAME file path.
+    # Use separate files and inform the user; keep requested path as stdout target.
+    $stdoutFile = $LogFile
+    $stderrFile = if ($LogFile.Contains('.')) { $LogFile -replace '\.[^\.]+$', '.err.log' } else { "$LogFile.err" }
+  $proc = Start-Process -FilePath $pythonExe -ArgumentList $argList -PassThru -NoNewWindow -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+    Write-Host "[bg] Logging -> stdout: $stdoutFile | stderr: $stderrFile"
+  } else {
+  $proc = Start-Process -FilePath $pythonExe -ArgumentList $argList -PassThru -NoNewWindow
   }
   Write-Host "[bg] PID=$($proc.Id). To stop: Stop-Process -Id $($proc.Id)"
   if ($Mode -eq 'http') {

@@ -24,6 +24,7 @@ from pydantic import ValidationError
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+from datacommons_mcp import services  # import module so tests can monkeypatch its members
 import datacommons_mcp.settings as settings
 from datacommons_mcp.clients import create_dc_client
 from datacommons_mcp.data_models.charts import (
@@ -38,15 +39,7 @@ from datacommons_mcp.data_models.observations import (
     ObservationDateType,
     ObservationToolResponse,
 )
-from datacommons_mcp.data_models.search import (
-    SearchResponse,
-)
-from datacommons_mcp.services import (
-    get_observations as get_observations_service,
-)
-from datacommons_mcp.services import (
-    search_indicators as search_indicators_service,
-)
+from datacommons_mcp.data_models.search import SearchResponse
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -71,7 +64,6 @@ async def health_check(request: Request) -> PlainTextResponse:  # noqa: ARG001 r
     return PlainTextResponse("OK")
 
 
-@mcp.tool()  # type: ignore[misc]
 async def get_observations(
     variable_dcid: str,
     place_dcid: str,
@@ -150,8 +142,9 @@ async def get_observations(
 
     """
     # TODO(keyurs): Remove place_name parameter from the service call.
-    return await get_observations_service(
-        client=dc_client,
+    # Call via services module to allow test monkeypatching (tests replace services.get_observations)
+    return await services.get_observations(
+        dc_client,
         variable_dcid=variable_dcid,
         place_dcid=place_dcid,
         place_name=None,
@@ -316,7 +309,6 @@ async def get_datacommons_chart_config(
         raise ValueError(f"Validation failed for chart_type '{chart_type}': {e}") from e
 
 
-@mcp.tool()  # type: ignore[misc]
 async def search_indicators(
     query: str,
     places: list[str] | None = None,
@@ -565,9 +557,9 @@ async def search_indicators(
 
     **Final Reminder:** Always treat results as *candidates*. You must filter and rank them based on the user's full context.
     """
-    # Call the real search_indicators service
-    return await search_indicators_service(
-        client=dc_client,
+    # Call the real search_indicators service via services module so tests can monkeypatch
+    return await services.search_indicators(
+        dc_client,
         query=query,
         places=places,
         per_search_limit=per_search_limit,
@@ -575,4 +567,9 @@ async def search_indicators(
         maybe_bilateral=maybe_bilateral,
     )
 
-# Using decorator-based registration; no manual fallback needed.
+# Register tools without replacing function symbols so tests can call functions directly.
+try:  # pragma: no cover
+  mcp.tool()(get_observations)
+  mcp.tool()(search_indicators)
+except Exception as _reg_err:  # noqa: BLE001
+  logger.warning("Tool registration error: %s", _reg_err)

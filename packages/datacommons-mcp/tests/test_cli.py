@@ -24,37 +24,37 @@ def test_version_option():
 
 
 @mock.patch.dict(os.environ, {"DC_API_KEY": "test-key"})
-@mock.patch("datacommons_mcp.server.mcp.run")
+@mock.patch("uvicorn.run")
 @mock.patch("datacommons_mcp.cli.validate_api_key")
-def test_serve_validates_key_by_default(mock_validate, mock_run):
+def test_serve_validates_key_by_default(mock_validate, mock_uvicorn_run):
     """Tests that the serve command calls validate_api_key by default."""
     runner = CliRunner()
     runner.invoke(cli, ["serve", "http"])
     mock_validate.assert_called_once()
-    mock_run.assert_called_once()
+    mock_uvicorn_run.assert_called_once()
 
 
 @mock.patch.dict(os.environ, {"DC_API_KEY": "test-key"})
-@mock.patch("datacommons_mcp.server.mcp.run")
+@mock.patch("uvicorn.run")
 @mock.patch("datacommons_mcp.cli.validate_api_key")
-def test_serve_skip_validation_flag(mock_validate, mock_run):
+def test_serve_skip_validation_flag(mock_validate, mock_uvicorn_run):
     """Tests that the --skip-api-key-validation flag works."""
     runner = CliRunner()
     runner.invoke(cli, ["serve", "http", "--skip-api-key-validation"])
     mock_validate.assert_not_called()
-    mock_run.assert_called_once()
+    mock_uvicorn_run.assert_called_once()
 
 
 @mock.patch.dict(os.environ, {"DC_API_KEY": "test-key"})
-@mock.patch("datacommons_mcp.server.mcp.run")
+@mock.patch("uvicorn.run")
 @mock.patch(
     "datacommons_mcp.cli.validate_api_key", side_effect=InvalidAPIKeyError("Test error")
 )
-def test_serve_validation_failure_exits(mock_validate, mock_run):
+def test_serve_validation_failure_exits(mock_validate, mock_uvicorn_run):
     """Tests that the command exits on validation failure."""
     runner = CliRunner()
     result = runner.invoke(cli, ["serve", "http"])
     mock_validate.assert_called_once()
-    mock_run.assert_not_called()
+    mock_uvicorn_run.assert_not_called()
     assert result.exit_code == 1
     assert "Test error" in result.output

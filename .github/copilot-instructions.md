@@ -46,6 +46,11 @@ Use these project-specific guidelines when writing code, tests, or docs. Keep ch
 - Setting up env: export `DC_API_KEY` (required). For custom instances also set `CUSTOM_DC_URL` and optionally `DC_SEARCH_SCOPE`, `DC_ROOT_TOPIC_DCIDS`.
 - Start server (HTTP): `uvx datacommons-mcp serve http --port 8080`  → health at `/health`.
 - Start server (stdio): `uvx datacommons-mcp serve stdio`.
+- PowerShell helper script: `./scripts/start-server.ps1 -Mode http -Port 8080` (handles venv + editable install + .env load). Use `-SkipApiKeyValidation` for exploration.
+- Persistence: HTTP now runs via uvicorn (`uvicorn.run(mcp.http_app)`) to avoid early shutdown in FastMCP >= 2.12.
+- Tool registration: tools added with `mcp.tool()(fn)` to keep original async functions callable in tests (avoid decorator replacement of symbols).
+- Async enumeration: `mcp.get_tools()` is async; tests/diagnostics must `await` or `asyncio.run` it.
+- Test fixture dependency: `requests-mock` provides the `requests_mock` fixture; ensure it is installed when adding API call tests.
 
 ## 7. Code Style & Quality
 - Preserve logging structure: use module-level `logger = logging.getLogger(__name__)`.
@@ -55,6 +60,49 @@ Use these project-specific guidelines when writing code, tests, or docs. Keep ch
 
 ## 8. When Unsure
 Leverage existing patterns—mirror how `search_indicators` and `get_observations` coordinate validation, caching, transformation. Add clarifying docstrings where logic is complex; keep instructions concise.
+
+### 8.1 Quick Safety Checklist Before Adding Code
+- Did you avoid direct Data Commons API calls in `server.py` (should route through `services`)?
+- Did you call `search_indicators` first in examples before `get_observations`? Never invent DCIDs.
+- Are new tests asserting domain exceptions rather than generic ones?
+- If adding a child place mode example, did you show sampling 5–6 diverse children?
+- Avoid `date='all'` with child place mode unless explicitly justified.
+
+### 8.2 Common Regression Pitfalls Observed
+- Replacing async tool functions with decorator-returned objects breaks direct test calls.
+- Forgetting to await `get_tools()` leads to tool enumeration failures.
+- Using unqualified place names in searches causes ambiguous resolutions.
+- Omitting source selection tie-breaker order changes test determinism.
+
+### 8.3 Environment & Shell Gotchas (Do NOT repeat)
+These have caused repeated friction; avoid them up front:
+
+1. Virtual environment activation:
+  - The editable install (`pip install -e packages/datacommons-mcp`) lives in the repo venv `.venv`.
+  - If you run `python -m datacommons_mcp.cli ...` with the system Python you will get `ModuleNotFoundError: No module named 'datacommons_mcp'`.
+  - Always either:
+    * Activate first: `./.venv/Scripts/Activate.ps1` (PowerShell) then run commands, or
+    * Call the interpreter explicitly: `./.venv/Scripts/python.exe -m datacommons_mcp.cli serve http --port 8080`.
+
+2. PowerShell vs Bash syntax:
+  - PowerShell does NOT support Bash heredoc invocation syntax like: `python - <<'PY'`.
+  - Attempting this leaves a stray `PY` token and the code never runs.
+  - Use one of:
+    * Inline: `python -c "import uvicorn; from datacommons_mcp.server import mcp; uvicorn.run(mcp.http_app, host='localhost', port=8080)"`
+    * Temp file: write a `.py` file then `python file.py`.
+    * Here-string into file:
+     ```powershell
+     @"\nimport uvicorn\nfrom datacommons_mcp.server import mcp\nuvicorn.run(mcp.http_app, host='localhost', port=8080)\n"@ | Set-Content run_server.py
+     python run_server.py
+     ```
+
+3. Log redirection in background processes:
+  - `Start-Process` cannot redirect stdout and stderr to the SAME file; script already splits (`server.log` / `server.err.log`). Do not "fix" this by making both paths identical.
+
+4. Health check expectations:
+  - Successful HTTP start exposes `/health`. If missing, verify you used venv Python and no silent import failure occurred.
+
+Keep these in mind before assuming a port or server bug.
 
 ---
 If guidance seems incomplete (e.g., need adding a new chart type or endpoint deprecation path), surface a clarification request instead of guessing.

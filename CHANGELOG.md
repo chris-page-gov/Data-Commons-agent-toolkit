@@ -19,6 +19,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - (none)
 
+## [1.1.0rc2] - 2025-10-23
+
+### 1.1.0rc2 Added
+
+- Async tool enumeration test (`test_tools_registration.py`) ensuring FastMCP registration viability.
+- Added `requests-mock` test dependency to support `requests_mock` fixture (API key validation tests).
+
+### 1.1.0rc2 Changed
+
+- Pinned core runtime dependencies in `pyproject.toml` (fastapi, uvicorn, fastmcp, requests, datacommons-client, pydantic, pydantic-settings, python-dateutil) for reproducible builds.
+- HTTP serving refactored: use `uvicorn.run(mcp.http_app)` instead of `mcp.run(streamable-http)` due to FastMCP lifecycle changes.
+- Manual tool registration retained (avoid decorator symbol replacement) to keep direct function callability in tests; agent instruction docs updated to emphasize search→observe workflow and child place sampling rules.
+
+### 1.1.0rc2 Fixed
+
+- Eliminated premature server exit under FastMCP 2.12+ by switching to explicit uvicorn run.
+
 ## [1.1.0rc1] - 2025-10-21
 
 ### 1.1.0rc1 Added
@@ -43,4 +60,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Source selection algorithm and date filtering semantics.
 
 [Unreleased]: https://github.com/chris-page-gov/Data-Commons-agent-toolkit/compare/main...crpage
+[1.1.0rc2]: https://github.com/chris-page-gov/Data-Commons-agent-toolkit/compare/1.1.0rc1...1.1.0rc2
 [1.1.0rc1]: https://github.com/chris-page-gov/Data-Commons-agent-toolkit/compare/1.0.0...1.1.0rc1

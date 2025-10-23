@@ -118,6 +118,46 @@ uvx datacommons-mcp serve stdio
 
 Ensure `DC_API_KEY` is exported; add `CUSTOM_DC_URL` for custom instances.
 
+### 8.0 PowerShell Helper Script
+
+On Windows (or PowerShell Core), prefer the helper script which creates the
+venv if missing, performs an editable install, loads `.env`, and can run in
+foreground or background:
+
+```powershell
+./scripts/start-server.ps1 -Mode http -Port 8080
+./scripts/start-server.ps1 -Mode stdio
+./scripts/start-server.ps1 -Mode http -Activate  # activates venv in current shell
+./scripts/start-server.ps1 -Mode http -SkipApiKeyValidation  # bypass API key check
+```
+
+Background mode example with logging:
+
+```powershell
+./scripts/start-server.ps1 -Mode http -Background -LogFile server.log
+Get-Content server.log -Tail 40
+```
+
+### 8.0.1 Persistence Change (FastMCP >= 2.12)
+
+The server now runs HTTP via `uvicorn.run(mcp.http_app)` instead of the previous
+`mcp.run(streamable-http)` to avoid early shutdown behavior observed with
+newer FastMCP releases. Stdio mode still uses `mcp.run(transport="stdio")`.
+
+### 8.0.2 Manual Tool Registration
+
+Tools are registered manually (`mcp.tool()(fn)`) after definition in `server.py`
+instead of using decorators directly. This preserves the original async
+function objects so tests and agents can call them without `FunctionTool`
+wrapping side-effects and simplifies monkeypatching.
+
+### 8.0.3 Test Fixture Dependency
+
+API key validation tests rely on the `requests_mock` fixture provided by the
+`requests-mock` package. It is now pinned in `pyproject.toml`. If you run the
+suite in a fresh environment ensure dependencies are installed so the fixture
+is available.
+
 ### 8.1 VS Code Integration
 
 This repository includes `.vscode/tasks.json` and `.vscode/launch.json` to streamline running and debugging the MCP server.
@@ -209,3 +249,32 @@ If you see `uvx: The term 'uvx' is not recognized`, it means uv was not installe
 ## 10. Attribution
 
 Copyright 2025 Google LLC. Licensed under Apache 2.0.
+
+## 11. Troubleshooting (Common Pitfalls)
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| `ModuleNotFoundError: No module named 'datacommons_mcp'` | Using system Python instead of project venv | Activate venv: `./.venv/Scripts/Activate.ps1` (PowerShell) or call `./.venv/Scripts/python.exe -m datacommons_mcp.cli ...` |
+| Stray `PY` printed / command ignored | Attempted Bash heredoc (`python - <<'PY'`) in PowerShell | Use `python -c "..."`, temp file, or here-string piped to `Set-Content` |
+| Server starts but `/health` 404 or connection refused | Wrong interpreter / import failure before uvicorn binds | Re-run inside venv; check logs for early exception |
+| Background logs missing stderr | PowerShell cannot redirect stdout & stderr to same file | Use helper script `start-server.ps1 -Background -LogFile server.log` (stderr auto-split) |
+| Child place request with `date="all"` fails | Data volume guard | Switch to `date="latest"` or bounded `range` |
+| Ambiguous place results (e.g., wrong "Springfield") | Unqualified place name | Qualify: `Springfield, IL, USA` |
+| Variable not found for hierarchy | Skipped child sampling | Include parent + 5–6 diverse children in `search_indicators` |
+| Tool enumeration error (`await` missing) | Forgot async get_tools usage | Use `asyncio.run(mcp.get_tools())` in diagnostics |
+
+### Quick Diagnostic Script (PowerShell)
+
+```powershell
+./scripts/preflight.ps1 -Verbose
+```
+
+Runs: venv check, editable install presence, core imports, API key existence, and prints actionable messages before you start the server.
+
+### Minimal Health Check
+
+```powershell
+curl http://localhost:8080/health
+```
+
+Should return `OK`. If not, verify interpreter path and API key handling.
